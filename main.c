@@ -37,6 +37,8 @@ int detach_char = '\\' - 64;
 int no_suspend;
 /* The default redraw method. Initially set to unspecified. */
 int redraw_method = REDRAW_UNSPEC;
+/* Attach in monitor mode (don't process stdin) */
+int monitor_mode = 0;
 
 /*
 ** The original terminal settings. Shared between the master and attach
@@ -62,6 +64,7 @@ usage()
 		"  -c\t\tCreate a new socket and run the specified command.\n"
 		"  -n\t\tCreate a new socket and run the specified command "
 		"detached.\n"
+		"  -m\t\tAttach to specified socket in monitor mode.\n"
 		"Options:\n"
 		"  -e <char>\tSet the detach character to <char>, defaults "
 		"to ^\\.\n"
@@ -102,7 +105,7 @@ main(int argc, char **argv)
 		if (mode == '?')
 			usage();
 		else if (mode != 'a' && mode != 'c' && mode != 'n' &&
-			 mode != 'A')
+			 mode != 'A' && mode != 'm')
 		{
 			printf("%s: Invalid mode '-%c'\n", progname, mode);
 			printf("Try '%s --help' for more information.\n",
@@ -200,7 +203,7 @@ main(int argc, char **argv)
 		++argv; --argc;
 	}
 
-	if (mode != 'a' && argc < 1)
+	if ((mode != 'a' && mode != 'm') && argc < 1)
 	{
 		printf("%s: No command was specified.\n", progname);
 		printf("Try '%s --help' for more information.\n",
@@ -215,14 +218,14 @@ main(int argc, char **argv)
 		dont_have_tty = 1;
 	}
 
-	if (dont_have_tty && mode != 'n')
+	if (dont_have_tty && mode != 'n' && mode != 'm')
 	{
 		printf("%s: Attaching to a session requires a terminal.\n",
 			progname);
 		return 1;
 	}
 
-	if (mode == 'a')
+	if (mode == 'a' || mode == 'm')
 	{
 		if (argc > 0)
 		{
@@ -232,6 +235,8 @@ main(int argc, char **argv)
 				progname);
 			return 1;
 		}
+        if (mode == 'm') 
+            monitor_mode = 1;
 		return attach_main(0);
 	}
 	else if (mode == 'n')

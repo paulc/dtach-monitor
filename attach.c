@@ -174,30 +174,31 @@ attach_main(int noerror)
 	signal(SIGQUIT, die);
 	signal(SIGWINCH, win_change);
 
-	/* Set raw mode. */
-	cur_term.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
-	cur_term.c_iflag &= ~(IXON|IXOFF);
-	cur_term.c_oflag &= ~(OPOST);
-	cur_term.c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
-	cur_term.c_cflag &= ~(CSIZE|PARENB);
-	cur_term.c_cflag |= CS8;
-	cur_term.c_cc[VLNEXT] = VDISABLE;
-	cur_term.c_cc[VMIN] = 1;
-	cur_term.c_cc[VTIME] = 0;
-	tcsetattr(0, TCSADRAIN, &cur_term);
-
-	/* Clear the screen. This assumes VT100. */
-	write(1, "\33[H\33[J", 6);
+	/* Set raw mode unless we are in monitor mode */
+    if (monitor_mode == 0) {
+        cur_term.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL);
+        cur_term.c_iflag &= ~(IXON|IXOFF);
+        cur_term.c_oflag &= ~(OPOST);
+        cur_term.c_lflag &= ~(ECHO|ECHONL|ICANON|ISIG|IEXTEN);
+        cur_term.c_cflag &= ~(CSIZE|PARENB);
+        cur_term.c_cflag |= CS8;
+        cur_term.c_cc[VLNEXT] = VDISABLE;
+        cur_term.c_cc[VMIN] = 1;
+        cur_term.c_cc[VTIME] = 0;
+        tcsetattr(0, TCSADRAIN, &cur_term);
+    }
+    /* Clear the screen. This assumes VT100. */
+    write(1, "\33[H\33[J", 6);
 
 	/* Tell the master that we want to attach. */
 	pkt.type = MSG_ATTACH;
 	write(s, &pkt, sizeof(struct packet));
 
 	/* We would like a redraw, too. */
-	pkt.type = MSG_REDRAW;
-	pkt.len = redraw_method;
-	ioctl(0, TIOCGWINSZ, &pkt.u.ws);
-	write(s, &pkt, sizeof(struct packet));
+    pkt.type = MSG_REDRAW;
+    pkt.len = redraw_method;
+    ioctl(0, TIOCGWINSZ, &pkt.u.ws);
+    write(s, &pkt, sizeof(struct packet));
 
 	/* Wait for things to happen */
 	while (1)
@@ -205,7 +206,10 @@ attach_main(int noerror)
 		int n;
 
 		FD_ZERO(&readfds);
-		FD_SET(0, &readfds);
+        /* Don't listen on stdin in monitor mode */
+        if (monitor_mode == 0) {
+            FD_SET(0, &readfds);
+        }
 		FD_SET(s, &readfds);
 		n = select(s + 1, &readfds, NULL, NULL, NULL);
 		if (n < 0 && errno != EINTR && errno != EAGAIN)
